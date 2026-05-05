@@ -1,0 +1,6 @@
+{
+  "name": "SonixWave",
+  "description": "System-wide audio enhancer prototype. Boost volume, adjust EQ, and limit clipping. (Browser sandbox compatible prototype)",
+  "requestFramePermissions": ["microphone", "display-capture"],
+  "majorCapabilities": []
+}
