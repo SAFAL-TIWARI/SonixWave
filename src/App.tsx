@@ -247,10 +247,13 @@ export default function App() {
                       <input value={bgImageUrl} onChange={(e) => setBgImageUrl(e.target.value)} placeholder="Image URL" className="w-full px-2 py-1 rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700" />
                     )}
                     {bgMode === 'video' && (
-                      <input value={bgVideoUrl} onChange={(e) => setBgVideoUrl(e.target.value)} placeholder="Video URL" className="w-full px-2 py-1 rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700" />
+                      <input value={bgVideoUrl} onChange={(e) => setBgVideoUrl(e.target.value)} placeholder="Video or social link" className="w-full px-2 py-1 rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700" />
                     )}
                     {bgMode === 'color' && (
                       <div className="text-xs text-zinc-400">Color reactive mode uses palette and audio beats.</div>
+                    )}
+                    {bgMode === 'video' && (
+                      <div className="text-xs text-zinc-400">Paste a direct media URL or a supported social post link such as YouTube, Instagram, or Vimeo.</div>
                     )}
                   </div>
 

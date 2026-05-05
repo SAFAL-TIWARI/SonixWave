@@ -1,6 +1,105 @@
 import React, { useEffect, useRef, useState } from "react";
 import { audioEngine } from "../lib/audioEngine";
 
+type VideoSource = {
+  kind: "video" | "embed";
+  url: string;
+  provider: string;
+};
+
+const DIRECT_VIDEO_EXTENSIONS = [".mp4", ".webm", ".ogg", ".mov", ".m4v", ".mp3", ".wav"];
+
+function isDirectMediaUrl(url: URL) {
+  const pathname = url.pathname.toLowerCase();
+  return DIRECT_VIDEO_EXTENSIONS.some((extension) => pathname.endsWith(extension));
+}
+
+function buildYouTubeEmbedUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./, "");
+  let videoId = "";
+
+  if (host === "youtu.be") {
+    videoId = url.pathname.split("/").filter(Boolean)[0] ?? "";
+  } else if (url.searchParams.get("v")) {
+    videoId = url.searchParams.get("v") ?? "";
+  } else {
+    const parts = url.pathname.split("/").filter(Boolean);
+    const embedIndex = parts.findIndex((part) => part === "embed" || part === "shorts");
+    if (embedIndex >= 0) {
+      videoId = parts[embedIndex + 1] ?? "";
+    }
+  }
+
+  if (!videoId) return null;
+
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${videoId}&playsinline=1&rel=0&modestbranding=1`;
+}
+
+function buildInstagramEmbedUrl(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length < 2) return null;
+
+  const postType = parts[0];
+  const shortcode = parts[1];
+
+  if (!["p", "reel", "tv"].includes(postType) || !shortcode) return null;
+
+  return `https://www.instagram.com/${postType}/${shortcode}/embed/`;
+}
+
+function buildVimeoEmbedUrl(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const id = parts.find((part) => /^\d+$/.test(part));
+  if (!id) return null;
+
+  return `https://player.vimeo.com/video/${id}?autoplay=1&muted=1&loop=1&background=1`;
+}
+
+function buildLinkedInEmbedUrl(url: URL) {
+  const feedUpdateMatch = url.pathname.match(/\/feed\/update\/(urn:li:[^/]+)/);
+  if (!feedUpdateMatch) return null;
+
+  return `${url.origin}/embed/feed/update/${feedUpdateMatch[1]}`;
+}
+
+function resolveVideoSource(input?: string): VideoSource | null {
+  const value = input?.trim();
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+
+    if (host.includes("youtube.com") || host === "youtu.be") {
+      const embedUrl = buildYouTubeEmbedUrl(url);
+      return embedUrl ? { kind: "embed", url: embedUrl, provider: "YouTube" } : null;
+    }
+
+    if (host.includes("instagram.com")) {
+      const embedUrl = buildInstagramEmbedUrl(url);
+      return embedUrl ? { kind: "embed", url: embedUrl, provider: "Instagram" } : null;
+    }
+
+    if (host.includes("vimeo.com")) {
+      const embedUrl = buildVimeoEmbedUrl(url);
+      return embedUrl ? { kind: "embed", url: embedUrl, provider: "Vimeo" } : null;
+    }
+
+    if (host.includes("linkedin.com")) {
+      const embedUrl = buildLinkedInEmbedUrl(url);
+      return embedUrl ? { kind: "embed", url: embedUrl, provider: "LinkedIn" } : null;
+    }
+
+    if (isDirectMediaUrl(url)) {
+      return { kind: "video", url: value, provider: "Direct media" };
+    }
+
+    return { kind: "video", url: value, provider: "Direct URL" };
+  } catch {
+    return null;
+  }
+}
+
 type Props = {
   imageUrl?: string;
   videoUrl?: string;
@@ -20,9 +119,10 @@ export const ReactiveBackground: React.FC<Props> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [scale, setScale] = useState(1);
   const [color, setColor] = useState<string>(palette[0]);
+  const resolvedVideo = resolveVideoSource(videoUrl);
 
   // Determine active mode: image > video > color
-  const mode = imageUrl ? "image" : videoUrl ? "video" : colorMode ? "color" : "none";
+  const mode = imageUrl ? "image" : resolvedVideo ? "video" : colorMode ? "color" : "none";
 
   useEffect(() => {
     let raf = 0;
@@ -108,7 +208,7 @@ export const ReactiveBackground: React.FC<Props> = ({
 
   // If video mode, ensure video plays
   useEffect(() => {
-    if (mode === "video" && videoRef.current) {
+    if (mode === "video" && resolvedVideo?.kind === "video" && videoRef.current) {
       const v = videoRef.current;
       v.muted = true;
       v.loop = true;
@@ -117,7 +217,7 @@ export const ReactiveBackground: React.FC<Props> = ({
       const p = v.play();
       if (p && p.catch) p.catch(() => {});
     }
-  }, [mode, videoUrl]);
+  }, [mode, resolvedVideo]);
 
   return (
     <div
@@ -146,16 +246,29 @@ export const ReactiveBackground: React.FC<Props> = ({
           />
         )}
 
-        {mode === "video" && videoUrl && (
+        {mode === "video" && resolvedVideo?.kind === "video" && (
           <video
             ref={videoRef}
-            src={videoUrl}
+            src={resolvedVideo.url}
             className="w-full h-full object-cover block"
             style={{ filter: "brightness(0.35) contrast(1.05)", transformOrigin: "center" }}
             playsInline
             muted
             loop
             autoPlay
+          />
+        )}
+
+        {mode === "video" && resolvedVideo?.kind === "embed" && (
+          <iframe
+            src={resolvedVideo.url}
+            title={`${resolvedVideo.provider} background video`}
+            className="w-full h-full block border-0"
+            style={{ filter: "brightness(0.35) contrast(1.05)", transformOrigin: "center" }}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
           />
         )}
 
