@@ -33,6 +33,7 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
+  private suppressLocalAudioPlayback = false;
 
   // DSP Nodes
   public eqBands: BiquadFilterNode[] = [];
@@ -59,6 +60,23 @@ export class AudioEngine {
 
   constructor() {}
 
+  public setSourcePlaybackMuted(muted: boolean) {
+    this.suppressLocalAudioPlayback = muted;
+
+    if (!this.stream) return;
+
+    const audioTracks = this.stream.getAudioTracks();
+    for (const track of audioTracks) {
+      track
+        .applyConstraints({
+          suppressLocalAudioPlayback: muted,
+        } as MediaTrackConstraints)
+        .catch((err) => {
+          console.warn("Unable to update local source playback suppression", err);
+        });
+    }
+  }
+
   public async initialize(onStreamError?: () => void) {
     if (this.ctx) return;
     this.ctx = new AudioContext({ latencyHint: "interactive" });
@@ -71,7 +89,8 @@ export class AudioEngine {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-        },
+          suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
+        } as MediaTrackConstraints,
       });
     } catch (e) {
       console.warn("Display media denied, falling back to microphone for testing.");
@@ -91,6 +110,8 @@ export class AudioEngine {
     }
 
     if (!this.stream) return;
+
+  this.setSourcePlaybackMuted(this.suppressLocalAudioPlayback);
 
     this.source = this.ctx.createMediaStreamSource(this.stream);
 

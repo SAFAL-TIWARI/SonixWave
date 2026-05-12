@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Headphones, Power, MonitorUp, Settings2, RefreshCcw, Activity, Disc, Layers, SlidersHorizontal, Waves } from "lucide-react";
+import { Headphones, Power, MonitorUp, Settings2, RefreshCcw, Activity, Disc, Layers, SlidersHorizontal, Waves, VolumeX } from "lucide-react";
 import { audioEngine } from "./lib/audioEngine";
 import { VerticalSlider, Knob, HorizontalSlider } from "./components/Controls";
 import { Visualizer } from "./components/Visualizer";
@@ -22,6 +22,7 @@ export default function App() {
   const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0]);
   const [isClipping, setIsClipping] = useState(false);
   const [peakReduction, setPeakReduction] = useState(0);
+  const [muteCapturedSourcePlayback, setMuteCapturedSourcePlayback] = useState(true);
 
   const [activeView, setActiveView] = useState<'master' | 'fx'>('master');
 
@@ -73,6 +74,7 @@ export default function App() {
       audioEngine.stop();
       setIsConnected(false);
     } else {
+      audioEngine.setSourcePlaybackMuted(muteCapturedSourcePlayback);
       await audioEngine.initialize(() => {
         setIsConnected(false);
       });
@@ -109,6 +111,12 @@ export default function App() {
   const handleFxChange = (fxId: FxKey, val: number) => {
     setFxState((prev) => ({ ...prev, [fxId]: val }));
     audioEngine.setFxAmount(fxId, val);
+  };
+
+  const handleMuteCapturedSourceToggle = async () => {
+    const next = !muteCapturedSourcePlayback;
+    setMuteCapturedSourcePlayback(next);
+    audioEngine.setSourcePlaybackMuted(next);
   };
 
   const applyPreset = (name: keyof typeof PRESETS) => {
@@ -169,6 +177,20 @@ export default function App() {
                 <Power className="w-4 h-4" />
                 {isBypassed ? "Bypass Active" : "Bypass Engine"}
               </button>
+
+              <button
+                onClick={handleMuteCapturedSourceToggle}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                  muteCapturedSourcePlayback
+                    ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"
+                    : "text-zinc-400 hover:bg-zinc-800/50"
+                }`}
+                title="Best effort browser support: mutes local playback from a captured tab or window when the browser supports it"
+              >
+                <VolumeX className="w-4 h-4" />
+                {muteCapturedSourcePlayback ? "Captured Source Muted" : "Mute Captured Source"}
+              </button>
+              
             </div>
           </div>
 
@@ -193,7 +215,7 @@ export default function App() {
              </button>
              {!isConnected && (
                <p className="text-[10px] text-zinc-500 text-center mt-3 mx-1">
-                 Browser prototype: Select a Chrome Tab or Entire Screen with "Share System Audio" checked.
+                 Browser prototype: Select a Chrome Tab or Entire Screen with "Share System Audio" checked. Enable source mute if the original tab/window keeps playing locally.
                </p>
              )}
           </div>
