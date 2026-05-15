@@ -18,6 +18,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isBypassed, setIsBypassed] = useState(false);
   const [masterBoost, setMasterBoost] = useState(100);
+  const [manualBoostInput, setManualBoostInput] = useState("100");
   const [currentPreset, setCurrentPreset] = useState("Flat");
   const [eqGains, setEqGains] = useState<number[]>([0, 0, 0, 0, 0]);
   const [isClipping, setIsClipping] = useState(false);
@@ -97,7 +98,22 @@ export default function App() {
 
   const handleBoostChange = (val: number) => {
     setMasterBoost(val);
+    setManualBoostInput(String(val));
     audioEngine.setMasterBoost(val);
+  };
+
+  const applyManualBoostInput = () => {
+    const parsedValue = Number(manualBoostInput);
+
+    if (Number.isNaN(parsedValue)) {
+      setManualBoostInput(String(masterBoost));
+      return;
+    }
+
+    const clampedValue = Math.max(0, Math.min(1000, parsedValue));
+    setMasterBoost(clampedValue);
+    setManualBoostInput(String(clampedValue));
+    audioEngine.setMasterBoost(clampedValue);
   };
 
   const handleEqChange = (index: number, val: number) => {
@@ -316,7 +332,38 @@ export default function App() {
                   <div className="mt-8 flex w-full justify-between px-4 text-xs font-medium text-zinc-500 font-mono">
                     <span>0%</span>
                     <span>100%</span>
-                    <span className="text-cyan-400/70">1000%</span>
+                    <span>1000%</span>
+                  </div>
+                  <div className="mt-4 w-full px-4">
+                    <label className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.28em] text-zinc-500">
+                      Manual Volume
+                    </label>
+                    <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        step={1}
+                        value={manualBoostInput}
+                        onChange={(e) => setManualBoostInput(e.target.value)}
+                        onBlur={applyManualBoostInput}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            applyManualBoostInput();
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="w-full bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                        placeholder="Enter volume 0 - 1000"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyManualBoostInput}
+                        className="shrink-0 rounded-lg bg-cyan-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-500/25"
+                      >
+                        Apply
+                      </button>
+                    </div>
                   </div>
                 </div>
 
