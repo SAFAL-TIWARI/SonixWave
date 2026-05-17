@@ -16,6 +16,7 @@ const PRESETS = {
 
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isBypassed, setIsBypassed] = useState(false);
   const [masterBoost, setMasterBoost] = useState(100);
   const [manualBoostInput, setManualBoostInput] = useState("100");
@@ -119,18 +120,33 @@ export default function App() {
       audioEngine.stop();
       setIsConnected(false);
     } else {
+      setIsConnecting(true);
+      const startTime = performance.now();
+      console.log("[SonixWave] Starting audio capture...");
+      
       audioEngine.setSourcePlaybackMuted(muteCapturedSourcePlayback);
-      await audioEngine.initialize(() => {
-        setIsConnected(false);
-      });
-      // Apply current state
-      audioEngine.setBypass(isBypassed);
-      audioEngine.setMasterBoost(masterBoost);
-      eqGains.forEach((gain, i) => audioEngine.setEqBand(i, gain));
-      (Object.entries(fxState) as [FxKey, number][]).forEach(([key, val]) => {
-        audioEngine.setFxAmount(key, val);
-      });
-      setIsConnected(true);
+      
+      try {
+        await audioEngine.initialize(() => {
+          setIsConnected(false);
+        });
+        
+        const initTime = performance.now() - startTime;
+        console.log(`[SonixWave] Audio capture initialized in ${initTime.toFixed(2)}ms`);
+        
+        // Apply current state
+        audioEngine.setBypass(isBypassed);
+        audioEngine.setMasterBoost(masterBoost);
+        eqGains.forEach((gain, i) => audioEngine.setEqBand(i, gain));
+        (Object.entries(fxState) as [FxKey, number][]).forEach(([key, val]) => {
+          audioEngine.setFxAmount(key, val);
+        });
+        setIsConnected(true);
+      } catch (err) {
+        console.error("[SonixWave] Audio capture failed:", err);
+      } finally {
+        setIsConnecting(false);
+      }
     }
   };
 
@@ -257,13 +273,20 @@ export default function App() {
           <div className="pt-6 border-t border-zinc-800/60">
              <button
                 onClick={handleConnect}
+                disabled={isConnecting}
                 className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${
-                  isConnected 
+                  isConnecting
+                    ? "bg-zinc-700 text-zinc-300 border border-zinc-600 cursor-wait opacity-75"
+                    : isConnected 
                     ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700" 
                     : "bg-cyan-500 hover:bg-cyan-400 text-zinc-950 shadow-[0_0_15px_rgba(6,182,212,0.3)]"
                 }`}
               >
-                {isConnected ? (
+                {isConnecting ? (
+                  <>
+                    <RefreshCcw className="w-4 h-4 animate-spin" /> Initializing...
+                  </>
+                ) : isConnected ? (
                   <>
                     <RefreshCcw className="w-4 h-4" /> Disconnect
                   </>

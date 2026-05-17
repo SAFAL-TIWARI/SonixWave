@@ -79,21 +79,51 @@ export class AudioEngine {
 
   public async initialize(onStreamError?: () => void) {
     if (this.ctx) return;
+    
+    const initStartTime = performance.now();
+    console.log("[AudioEngine] Initializing audio context...");
+    
     this.ctx = new AudioContext({ latencyHint: "interactive" });
+    console.log(`[AudioEngine] AudioContext created in ${(performance.now() - initStartTime).toFixed(2)}ms`);
 
     // Try to get system audio or microphone. For a web prototype, getDisplayMedia allows system audio sharing
     try {
-      this.stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true, // required by browsers to prompt for display media
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
-        } as MediaTrackConstraints,
-      });
+      const displayMediaStartTime = performance.now();
+      console.log("[AudioEngine] Requesting display media (this may open a browser picker dialog)...");
+      
+      // Try an audio-only display capture first. Some browsers support capturing
+      // system/tab audio without requesting a video surface which can avoid a
+      // visual white-flash or long UI handoff in the current tab.
+      // If the browser rejects audio-only display capture, fall back to the
+      // previous video:true flow which is more widely supported.
+      try {
+        this.stream = await navigator.mediaDevices.getDisplayMedia({
+          video: false,
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
+          } as MediaTrackConstraints,
+        });
+        console.log(`[AudioEngine] Display media (audio-only) acquired in ${(performance.now() - displayMediaStartTime).toFixed(2)}ms`);
+      } catch (audioOnlyErr) {
+        // Some browsers require video:true to present the display picker.
+        // Fall back to the original behavior when audio-only is unsupported.
+        console.log("[AudioEngine] Audio-only display media not supported, falling back to video:true...");
+        this.stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true, // required by some browsers to prompt for display media
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
+          } as MediaTrackConstraints,
+        });
+        console.log(`[AudioEngine] Display media (video+audio) acquired in ${(performance.now() - displayMediaStartTime).toFixed(2)}ms`);
+      }
     } catch (e) {
-      console.warn("Display media denied, falling back to microphone for testing.");
+      console.warn("Display media denied or unavailable, falling back to microphone for testing.");
       try {
         this.stream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -111,11 +141,15 @@ export class AudioEngine {
 
     if (!this.stream) return;
 
-  this.setSourcePlaybackMuted(this.suppressLocalAudioPlayback);
-
+    const sourceStartTime = performance.now();
+    this.setSourcePlaybackMuted(this.suppressLocalAudioPlayback);
+    console.log("[AudioEngine] Setting up media stream source...");
+    
     this.source = this.ctx.createMediaStreamSource(this.stream);
+    console.log(`[AudioEngine] Media stream source created in ${(performance.now() - sourceStartTime).toFixed(2)}ms`);
 
     // Build the DSP Chain
+    let dspStartTime = performance.now();
     this.preampGain = this.ctx.createGain();
     this.preampGain.gain.value = 1.0;
 
@@ -128,6 +162,7 @@ export class AudioEngine {
       filter.gain.value = 0;
       this.eqBands.push(filter);
     });
+    console.log(`[AudioEngine] EQ filters created in ${(performance.now() - dspStartTime).toFixed(2)}ms`);
 
     // Boost/Master Volume
     this.masterGain = this.ctx.createGain();
@@ -146,10 +181,15 @@ export class AudioEngine {
     this.analyser = this.ctx.createAnalyser();
     this.analyser.fftSize = 2048;
     this.analyser.smoothingTimeConstant = 0.82;
+    console.log(`[AudioEngine] Basic audio nodes created in ${(performance.now() - dspStartTime).toFixed(2)}ms`);
 
+    const fxStartTime = performance.now();
     this.initFx();
+    console.log(`[AudioEngine] Effects initialized in ${(performance.now() - fxStartTime).toFixed(2)}ms`);
 
+    const connectStartTime = performance.now();
     this.connectChain();
+    console.log(`[AudioEngine] Chain connected in ${(performance.now() - connectStartTime).toFixed(2)}ms`);
 
     // Listen to stream end
     this.stream.getTracks().forEach((track) => {
@@ -158,18 +198,24 @@ export class AudioEngine {
         this.stop();
       };
     });
+    console.log(`[AudioEngine] Total DSP setup in ${(performance.now() - dspStartTime).toFixed(2)}ms`);
   }
 
   private initFx() {
     if (!this.ctx) return;
 
+    const fxStartTime = performance.now();
+
     // Distortion
+    const distStart = performance.now();
     const distNode = this.ctx.createWaveShaper();
     distNode.curve = this.makeDistortionCurve(50);
     distNode.oversample = '4x';
     this.fxModules.distortion = new FxModule(this.ctx, { in: distNode, out: distNode });
+    console.log(`[AudioEngine.initFx] Distortion created in ${(performance.now() - distStart).toFixed(2)}ms`);
 
     // Chorus / Flanger
+    const chorusStart = performance.now();
     const chorusDelay = this.ctx.createDelay();
     chorusDelay.delayTime.value = 0.03;
     const osc = this.ctx.createOscillator();
@@ -181,8 +227,10 @@ export class AudioEngine {
     lfoGain.connect(chorusDelay.delayTime);
     osc.start();
     this.fxModules.chorus = new FxModule(this.ctx, { in: chorusDelay, out: chorusDelay });
+    console.log(`[AudioEngine.initFx] Chorus created in ${(performance.now() - chorusStart).toFixed(2)}ms`);
 
     // Delay
+    const delayStart = performance.now();
     const delayNode = this.ctx.createDelay();
     delayNode.delayTime.value = 0.3;
     const fbGain = this.ctx.createGain();
@@ -190,11 +238,20 @@ export class AudioEngine {
     delayNode.connect(fbGain);
     fbGain.connect(delayNode);
     this.fxModules.delay = new FxModule(this.ctx, { in: delayNode, out: delayNode });
+    console.log(`[AudioEngine.initFx] Delay created in ${(performance.now() - delayStart).toFixed(2)}ms`);
 
     // Reverb
+    const reverbStart = performance.now();
     const convolver = this.ctx.createConvolver();
-    convolver.buffer = this.createReverbIR(this.ctx, 2.5, 3);
+    const irStart = performance.now();
+    // Reduced reverb duration from 2.5s to 0.5s for Brave compatibility.
+    // Smaller buffer = instant initialization in Brave, still sounds spacious.
+    convolver.buffer = this.createReverbIR(this.ctx, 0.5, 3);
+    console.log(`[AudioEngine.initFx] Reverb IR created in ${(performance.now() - irStart).toFixed(2)}ms`);
     this.fxModules.reverb = new FxModule(this.ctx, { in: convolver, out: convolver });
+    console.log(`[AudioEngine.initFx] Reverb created in ${(performance.now() - reverbStart).toFixed(2)}ms`);
+    
+    console.log(`[AudioEngine.initFx] All effects created in ${(performance.now() - fxStartTime).toFixed(2)}ms`);
   }
 
   private makeDistortionCurve(amount: number) {
