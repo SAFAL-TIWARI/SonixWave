@@ -35,6 +35,13 @@ export default function App() {
   const [bgColorMode] = useState<boolean>(false); // kept for backwards compatibility
   const bgPalette: string[] = ["#06b6d4", "#0ea5a9", "#7c3aed", "#ef4444"];
   const [showBgControls, setShowBgControls] = useState(false);
+  const [spectrumStyle, setSpectrumStyle] = useState<'bars' | 'wave' | 'rainbow' | 'pulse'>('bars');
+
+  const BG_STORAGE_KEYS = {
+    mode: "sonixwave:bgMode",
+    imageUrl: "sonixwave:bgImageUrl",
+    videoUrl: "sonixwave:bgVideoUrl",
+  } as const;
   
   type FxKey = "distortion" | "chorus" | "delay" | "reverb";
   const [fxState, setFxState] = useState<Record<FxKey, number>>({
@@ -52,6 +59,43 @@ export default function App() {
   ];
 
   const bands = ["60", "230", "910", "3.6k", "14k"];
+
+  useEffect(() => {
+    try {
+      const savedMode = localStorage.getItem(BG_STORAGE_KEYS.mode) as 'none' | 'image' | 'video' | 'color' | null;
+      const savedImageUrl = localStorage.getItem(BG_STORAGE_KEYS.imageUrl) ?? "";
+      const savedVideoUrl = localStorage.getItem(BG_STORAGE_KEYS.videoUrl) ?? "";
+
+      if (savedMode) {
+        setBgMode(savedMode);
+      } else if (savedImageUrl) {
+        setBgMode("image");
+      } else if (savedVideoUrl) {
+        setBgMode("video");
+      }
+
+      setBgImageUrl(savedImageUrl);
+      setBgVideoUrl(savedVideoUrl);
+    } catch {
+      // Ignore storage errors in private/restricted browser modes.
+    }
+  }, []);
+
+  const saveBackgroundSetting = (kind: 'image' | 'video') => {
+    try {
+      const nextMode = kind;
+      localStorage.setItem(BG_STORAGE_KEYS.mode, nextMode);
+      if (kind === 'image') {
+        localStorage.setItem(BG_STORAGE_KEYS.imageUrl, bgImageUrl.trim());
+      } else {
+        localStorage.setItem(BG_STORAGE_KEYS.videoUrl, bgVideoUrl.trim());
+      }
+
+      setBgMode(nextMode);
+    } catch {
+      // Ignore storage errors in private/restricted browser modes.
+    }
+  };
 
   useEffect(() => {
     // Poll for clipping status to update UI indicator (Visualizer handles its own canvas)
@@ -143,8 +187,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-200 flex items-center justify-center p-6 font-sans selection:bg-cyan-500/30">
-      <div className="w-full max-w-4xl bg-zinc-900/80 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex shadow-black/50 relative backdrop-blur-sm">
+    <div className="min-h-screen bg-zinc-950 text-zinc-200 flex items-center justify-center p-5 font-sans selection:bg-cyan-500/30">
+      <div className="w-full max-w-6xl bg-zinc-900/80 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex shadow-black/50 relative backdrop-blur-sm">
         <ReactiveBackground
           imageUrl={bgMode === 'image' ? bgImageUrl : undefined}
           videoUrl={bgMode === 'video' ? bgVideoUrl : undefined}
@@ -282,10 +326,38 @@ export default function App() {
 
                   <div className="space-y-2">
                     {bgMode === 'image' && (
-                      <input value={bgImageUrl} onChange={(e) => setBgImageUrl(e.target.value)} placeholder="Image URL" className="w-full px-2 py-1 rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700" />
+                      <div className="relative">
+                        <input
+                          value={bgImageUrl}
+                          onChange={(e) => setBgImageUrl(e.target.value)}
+                          placeholder="Image URL"
+                          className="w-full rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700 px-2 py-1 pr-16"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveBackgroundSetting('image')}
+                          className="absolute right-1 top-1 rounded-md bg-cyan-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-500/25"
+                        >
+                          Save
+                        </button>
+                      </div>
                     )}
                     {bgMode === 'video' && (
-                      <input value={bgVideoUrl} onChange={(e) => setBgVideoUrl(e.target.value)} placeholder="Video or social link" className="w-full px-2 py-1 rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700" />
+                      <div className="relative">
+                        <input
+                          value={bgVideoUrl}
+                          onChange={(e) => setBgVideoUrl(e.target.value)}
+                          placeholder="Video or social link"
+                          className="w-full rounded bg-zinc-800/40 text-sm text-zinc-200 border border-zinc-700 px-2 py-1 pr-16"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveBackgroundSetting('video')}
+                          className="absolute right-1 top-1 rounded-md bg-cyan-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-500/25"
+                        >
+                          Save
+                        </button>
+                      </div>
                     )}
                     {bgMode === 'color' && (
                       <div className="text-xs text-zinc-400">Color reactive mode uses palette and audio beats.</div>
@@ -293,6 +365,18 @@ export default function App() {
                     {bgMode === 'video' && (
                       <div className="text-xs text-zinc-400">Paste a direct media URL or a supported social post link such as YouTube, Instagram, or Vimeo.</div>
                     )}
+                  </div>
+
+                  <div className="mt-3">
+                    <div className="text-xs text-zinc-400 mb-2">Spectrum Style</div>
+                    <div className="flex gap-2 mb-2 text-xs">
+                      <button onClick={() => setSpectrumStyle('bars')} className={`px-2 py-1 rounded ${spectrumStyle==='bars' ? 'bg-cyan-600/30 text-cyan-300' : 'bg-zinc-800/40 text-zinc-300'}`}>Bars</button>
+                      <button onClick={() => setSpectrumStyle('rainbow')} className={`px-2 py-1 rounded ${spectrumStyle==='rainbow' ? 'bg-cyan-600/30 text-cyan-300' : 'bg-zinc-800/40 text-zinc-300'}`}>Rainbow</button>
+                      
+                      <button onClick={() => setSpectrumStyle('pulse')} className={`px-2 py-1 rounded ${spectrumStyle==='pulse' ? 'bg-cyan-600/30 text-cyan-300' : 'bg-zinc-800/40 text-zinc-300'}`}>Pulse</button>
+                      <button onClick={() => setSpectrumStyle('wave')} className={`px-2 py-1 rounded ${spectrumStyle==='wave' ? 'bg-cyan-600/30 text-cyan-300' : 'bg-zinc-800/40 text-zinc-300'}`}>Waveform</button>
+                    </div>
+                    <div className="text-[10px] text-zinc-500">Choose the visual spectrum style used by the visualizer.</div>
                   </div>
 
                   <div className="mt-3 text-right">
@@ -304,7 +388,7 @@ export default function App() {
             </div>
           </div>
 
-          <Visualizer isClipping={isClipping} peakReduction={peakReduction} />
+          <Visualizer isClipping={isClipping} peakReduction={peakReduction} spectrum={spectrumStyle} />
 
           <div className="flex-1 grid grid-cols-12 gap-8 mt-8 relative">
             
@@ -390,19 +474,19 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <div className="col-span-12 bg-zinc-950/30 rounded-2xl border border-zinc-800/50 p-6 flex flex-col relative overflow-y-auto max-h-[340px]">
+              <div className="col-span-12 bg-zinc-950/30 rounded-2xl border border-zinc-800/50 p-4 flex flex-col relative overflow-y-auto max-h-[340px]">
                 <div className="text-xs font-semibold text-zinc-500 tracking-widest uppercase mb-6 flex items-center gap-2">
                   <Waves className="w-4 h-4 text-cyan-400" /> Effects Rack
                 </div>
                 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-3">
                   {FX_LIST.map(fx => {
                     const Icon = fx.icon;
                     return (
-                      <div key={fx.id} className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-5 flex flex-col gap-4">
+                      <div key={fx.id} className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-3 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center">
                               <Icon className={`w-4 h-4 ${fxState[fx.id as keyof typeof fxState] > 0 ? 'text-cyan-400' : 'text-zinc-500'}`} />
                             </div>
                             <div>

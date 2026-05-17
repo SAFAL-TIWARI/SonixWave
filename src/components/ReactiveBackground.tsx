@@ -134,15 +134,15 @@ export const ReactiveBackground: React.FC<Props> = ({
 
     const startLoopWith = (analyser: AnalyserNode) => {
       const data = new Uint8Array(analyser.frequencyBinCount);
+      const bassLowHz = 35;
+      const bassHighHz = 120;
 
       const loop = () => {
         if (stopped) return;
         analyser.getByteFrequencyData(data);
 
-        // Bass-only detector: focus on ~35-140 Hz so zoom follows kick/sub energy.
+        // Bass-only detector: keep the background motion locked to kick/sub energy.
         const binToHz = analyser.context.sampleRate / analyser.fftSize;
-        const bassLowHz = 40;
-        const bassHighHz = 140;
         const startBin = Math.max(0, Math.floor(bassLowHz / binToHz));
         const endBin = Math.min(data.length - 1, Math.ceil(bassHighHz / binToHz));
 
@@ -170,11 +170,11 @@ export const ReactiveBackground: React.FC<Props> = ({
         const smooth = prev * 0.82 + env * 0.18;
         prev = smooth;
 
-        // Map to scale
+        // The same bass envelope drives image, video, and color modes.
         const nextScale = 1 + smooth * maxScale;
         setScale(nextScale);
 
-        // If color mode, pick palette index based on energy
+        // Color mode uses the exact same bass signal, just mapped to palette steps.
         if (mode === "color") {
           const idx = Math.floor(smooth * (palette.length - 1));
           setColor(palette[idx] || palette[0]);
