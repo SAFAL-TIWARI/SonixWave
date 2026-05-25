@@ -27,6 +27,17 @@ class FxModule {
     this.wetGain.gain.setTargetAtTime(amount, ctx.currentTime, 0.05);
     this.dryGain.gain.setTargetAtTime(1 - amount, ctx.currentTime, 0.05);
   }
+
+  disconnect() {
+    const nodes = [this.input, this.output, this.wetGain, this.dryGain];
+    for (const node of nodes) {
+      try {
+        node.disconnect();
+      } catch {
+        // Ignore partially disconnected graphs while rebuilding the chain.
+      }
+    }
+  }
 }
 
 export class AudioEngine {
@@ -84,7 +95,8 @@ export class AudioEngine {
     console.log("[AudioEngine] Initializing audio context...");
     
     this.ctx = new AudioContext({ latencyHint: "interactive" });
-    console.log(`[AudioEngine] AudioContext created in ${(performance.now() - initStartTime).toFixed(2)}ms`);
+    await this.ctx.resume();
+    console.log(`[AudioEngine] AudioContext created in ${(performance.now() - initStartTime).toFixed(1)}ms`);
 
     // Try to get system audio or microphone. For a web prototype, getDisplayMedia allows system audio sharing
     try {
@@ -289,6 +301,7 @@ export class AudioEngine {
       return;
 
     this.source.disconnect();
+    Object.values(this.fxModules).forEach((fx) => fx.disconnect());
     this.eqBands.forEach((b) => b.disconnect());
     this.preampGain.disconnect();
     this.masterGain.disconnect();
@@ -313,7 +326,7 @@ export class AudioEngine {
       const fxChain = ['distortion', 'chorus', 'delay', 'reverb'];
       for (const fxName of fxChain) {
         const fx = this.fxModules[fxName];
-        if (fx) {
+        if (fx && this.fxState[fxName as keyof typeof this.fxState] > 0) {
           prevNode.connect(fx.input);
           prevNode = fx.output;
         }
@@ -352,9 +365,21 @@ export class AudioEngine {
   }
 
   public setFxAmount(fxName: keyof typeof this.fxState, amount: number) {
+    const wasActive = this.fxState[fxName] > 0;
+    const isActive = amount > 0;
     this.fxState[fxName] = amount;
-    if (this.fxModules[fxName]) {
-      this.fxModules[fxName].setMix(amount / 100);
+    const fx = this.fxModules[fxName];
+
+    if (fx && isActive) {
+      fx.setMix(amount / 100);
+    }
+
+    if (wasActive !== isActive) {
+      this.connectChain();
+
+      if (fx && isActive) {
+        fx.setMix(amount / 100);
+      }
     }
   }
 

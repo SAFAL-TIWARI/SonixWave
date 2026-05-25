@@ -17,7 +17,7 @@ const PRESETS = {
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isBypassed, setIsBypassed] = useState(false);
+  const [isBypassed, setIsBypassed] = useState(true);
   const [masterBoost, setMasterBoost] = useState(100);
   const [manualBoostInput, setManualBoostInput] = useState("100");
   const [currentPreset, setCurrentPreset] = useState("Flat");
