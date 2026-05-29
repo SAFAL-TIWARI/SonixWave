@@ -315,7 +315,7 @@ export default function App() {
               <p className="text-sm text-zinc-500">Global dynamics and equalizer control</p>
             </div>
             <div className="flex items-center gap-3">
-            <button 
+            {/* <button 
               onClick={() => setActiveView(activeView === 'master' ? 'fx' : 'master')}
               className={`p-2 flex items-center gap-2 transition-colors rounded-full px-4 ${
                 activeView === 'fx' 
@@ -325,7 +325,7 @@ export default function App() {
             >
               <SlidersHorizontal className="w-4 h-4" />
               <span className="text-xs font-semibold uppercase tracking-widest">{activeView === 'fx' ? 'Close FX' : 'Audio FX'}</span>
-            </button>
+            </button> */}
 
             {/* Background toggle / controls (user requested a UI toggle) */}
             <div className="relative">
