@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Headphones, Power, MonitorUp, Settings2, RefreshCcw, Activity, Disc, Layers, SlidersHorizontal, Waves, VolumeX } from "lucide-react";
+import { Headphones, Power, MonitorUp, Settings2, RefreshCcw, Activity, Disc, Layers, SlidersHorizontal, Waves, VolumeX, Puzzle } from "lucide-react";
 import { audioEngine } from "./lib/audioEngine";
 import { VerticalSlider, Knob, HorizontalSlider } from "./components/Controls";
 import { Visualizer } from "./components/Visualizer";
@@ -315,19 +315,19 @@ export default function App() {
               <p className="text-sm text-zinc-500">Global dynamics and equalizer control</p>
             </div>
             <div className="flex items-center gap-3">
-            {/* <button 
-              onClick={() => setActiveView(activeView === 'master' ? 'fx' : 'master')}
-              className={`p-2 flex items-center gap-2 transition-colors rounded-full px-4 ${
-                activeView === 'fx' 
-                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" 
-                  : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-              }`}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              <span className="text-xs font-semibold uppercase tracking-widest">{activeView === 'fx' ? 'Close FX' : 'Audio FX'}</span>
-            </button> */}
+              {/* Extension Link */}
+              <a
+                href="https://drive.google.com/file/d/1V08dRXY-ugE7d3g95NGBY8ewGPEKnNWj/view?usp=drive_link"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-full bg-zinc-800/50 text-zinc-300 hover:bg-zinc-800/70 hover:text-cyan-400 transition-colors flex items-center justify-center"
+                title="Get Chrome Extension"
+                aria-label="Get Chrome Extension"
+              >
+                <Puzzle className="w-4 h-4" />
+              </a>
 
-            {/* Background toggle / controls (user requested a UI toggle) */}
+              {/* Background toggle / controls (user requested a UI toggle) */}
             <div className="relative">
               <button
                 onClick={() => setShowBgControls((s) => !s)}
