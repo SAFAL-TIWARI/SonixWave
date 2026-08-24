@@ -71,6 +71,10 @@ export class AudioEngine {
 
   constructor() {}
 
+  public getStream(): MediaStream | null {
+    return this.stream;
+  }
+
   public setSourcePlaybackMuted(muted: boolean) {
     this.suppressLocalAudioPlayback = muted;
 
@@ -101,38 +105,27 @@ export class AudioEngine {
     // Try to get system audio or microphone. For a web prototype, getDisplayMedia allows system audio sharing
     try {
       const displayMediaStartTime = performance.now();
-      console.log("[AudioEngine] Requesting display media (this may open a browser picker dialog)...");
+      console.log("[AudioEngine] Requesting display media with video preview and system audio...");
       
-      // Try an audio-only display capture first. Some browsers support capturing
-      // system/tab audio without requesting a video surface which can avoid a
-      // visual white-flash or long UI handoff in the current tab.
-      // If the browser rejects audio-only display capture, fall back to the
-      // previous video:true flow which is more widely supported.
-      try {
-        this.stream = await navigator.mediaDevices.getDisplayMedia({
-          video: false,
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
-          } as MediaTrackConstraints,
+      this.stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
+        } as MediaTrackConstraints,
+      });
+      console.log(`[AudioEngine] Display media acquired in ${(performance.now() - displayMediaStartTime).toFixed(2)}ms`);
+      
+      if (this.stream && onStreamError) {
+        this.stream.getTracks().forEach((track) => {
+          track.onended = () => {
+            console.log("[AudioEngine] Media track ended by user");
+            this.stop();
+            onStreamError();
+          };
         });
-        console.log(`[AudioEngine] Display media (audio-only) acquired in ${(performance.now() - displayMediaStartTime).toFixed(2)}ms`);
-      } catch (audioOnlyErr) {
-        // Some browsers require video:true to present the display picker.
-        // Fall back to the original behavior when audio-only is unsupported.
-        console.log("[AudioEngine] Audio-only display media not supported, falling back to video:true...");
-        this.stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true, // required by some browsers to prompt for display media
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            suppressLocalAudioPlayback: this.suppressLocalAudioPlayback,
-          } as MediaTrackConstraints,
-        });
-        console.log(`[AudioEngine] Display media (video+audio) acquired in ${(performance.now() - displayMediaStartTime).toFixed(2)}ms`);
       }
     } catch (e) {
       console.warn("Display media denied or unavailable, falling back to microphone for testing.");
